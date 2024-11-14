@@ -104,10 +104,12 @@ void OnlineImage::update() {
   }
 
   std::list<http_request::Header> headers;
-  for (const auto &[key, value_template] : this->headers_) {
-    auto val = value_template();
-    if (val.has_value()) {
-      headers.push_back(http_request::Header{key, *val});
+  for (const auto &item : this->headers_) {
+    auto header_name = item.first;
+    auto header_value_template = item.second;
+    auto header_value = header_value_template();
+    if (header_value.has_value()) {
+      headers.push_back(http_request::Header{header_name, *header_value});
     }
   }
 
