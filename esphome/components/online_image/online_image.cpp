@@ -103,7 +103,16 @@ void OnlineImage::update() {
     ESP_LOGI(TAG, "Updating image");
   }
 
-  this->downloader_ = this->parent_->get(this->url_);
+
+  std::list<http_request::Header> headers;
+  for (const auto &item : this->headers_) {
+    auto val = item.second();
+    if (val.has_value()) {
+      headers.push_back(http_request::Header{item.first, *val});
+    }
+  }
+
+  this->downloader_ = this->parent_->get(this->url_, headers);
 
   if (this->downloader_ == nullptr) {
     ESP_LOGE(TAG, "Download failed.");
