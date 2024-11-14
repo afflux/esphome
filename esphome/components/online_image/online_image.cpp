@@ -103,12 +103,11 @@ void OnlineImage::update() {
     ESP_LOGI(TAG, "Updating image");
   }
 
-
   std::list<http_request::Header> headers;
-  for (const auto &item : this->headers_) {
-    auto val = item.second();
+  for (const auto &[key, value_template] : this->headers_) {
+    auto val = value_template();
     if (val.has_value()) {
-      headers.push_back(http_request::Header{item.first, *val});
+      headers.push_back(http_request::Header{key, *val});
     }
   }
 

@@ -160,7 +160,9 @@ async def to_code(config):
 
     for key in config.get(CONF_HTTP_REQUEST_HEADERS, []):
         template_ = await cg.templatable(
-            config[CONF_HTTP_REQUEST_HEADERS][key], [], cg.optional.template(cg.const_char_ptr)
+            config[CONF_HTTP_REQUEST_HEADERS][key],
+            [],
+            cg.optional.template(cg.const_char_ptr),
         )
         cg.add(var.add_header(key, template_))
 
