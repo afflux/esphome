@@ -203,22 +203,41 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
       buf = allocator.allocate(max_length);
     }
 
-    this->active_requests_.push_back(std::make_tuple(container, buf));
+    this->active_requests_.push_back(std::make_tuple(container, buf, max_length));
+  }
+
+  bool is_running() override { return !this->active_requests_.empty() || Action<Ts...>::is_running(); }
+
+  virtual void stop_complex() {
+    ExternalRAMAllocator<uint8_t> allocator(ExternalRAMAllocator<uint8_t>::ALLOW_FAILURE);
+
+    while (!this->active_requests_.empty()) {
+      const auto request = this->active_requests_.front();
+      auto container = std::get<0>(request);
+      auto buf = std::get<1>(request);
+      auto max_length = std::get<2>(request);
+      container->end();
+      if (buf != nullptr) {
+        allocator.deallocate(buf, max_length);
+      }
+      this->active_requests_.pop_front();
+    }
+
+    this->num_running_ = 0;
+    this->stop_next_();
   }
 
   void loop() override {
     this->active_requests_.remove_if([this](decltype(*this->active_requests_.cbegin()) &request) {
       auto container = std::get<0>(request);
       auto buf = std::get<1>(request);
+      size_t max_length = std::get<2>(request);
 
       if (container->duration_ms > this->parent_->get_timeout()) {
         for (auto *trigger : this->error_triggers_)
           trigger->trigger();
         return true;
       }
-
-      size_t content_length = container->content_length;
-      size_t max_length = std::min(content_length, this->max_response_buffer_size_);
 
       std::string response_body;
 
@@ -259,7 +278,7 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
   }
 
  protected:
-  std::list<std::tuple<std::shared_ptr<HttpContainer>, uint8_t *>> active_requests_{};
+  std::list<std::tuple<std::shared_ptr<HttpContainer>, uint8_t *, size_t>> active_requests_{};
   void encode_json_(Ts... x, JsonObject root) {
     for (const auto &item : this->json_) {
       auto val = item.second;
