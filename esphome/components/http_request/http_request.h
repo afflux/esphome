@@ -190,8 +190,7 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
     auto container = this->parent_->start(this->url_.value(x...), this->method_.value(x...), body, headers);
 
     if (container == nullptr) {
-      for (auto *trigger : this->error_triggers_)
-        trigger->trigger();
+      this->trigger_error_();
       return;
     }
 
@@ -237,8 +236,7 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
 
       auto duration_ms = now - container->start_ms;
       if (duration_ms > this->parent_->get_timeout()) {
-        for (auto *trigger : this->error_triggers_)
-          trigger->trigger();
+        this->trigger_error_();
         return true;
       }
 
@@ -246,8 +244,13 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
 
       if (buf != nullptr) {
         if (container->get_bytes_read() < max_length) {
-          container->read(buf + container->get_bytes_read(),
-                          std::min<size_t>(max_length - container->get_bytes_read(), 512));
+          int bytes_read = container->read(buf + container->get_bytes_read(),
+                                           std::min<size_t>(max_length - container->get_bytes_read(), 512));
+          if (bytes_read < 0) {
+            // reader error (e.g. timeout or stream pointer gone)
+            this->trigger_error_();
+            return true;
+          }
         }
 
         if (container->get_bytes_read() < max_length) {
@@ -288,6 +291,12 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
       root[item.first] = val.value(x...);
     }
   }
+
+  void trigger_error_() {
+    for (auto *trigger : this->error_triggers_)
+      trigger->trigger();
+  }
+
   void encode_json_func_(Ts... x, JsonObject root) { this->json_func_(x..., root); }
   HttpRequestComponent *parent_;
   std::map<const char *, TemplatableValue<const char *, Ts...>> headers_{};
