@@ -26,6 +26,7 @@ std::shared_ptr<HttpContainer> HttpRequestArduino::start(std::string url, std::s
   container->set_parent(this);
 
   const uint32_t start = millis();
+  container->start_ms = start;
 
   bool secure = url.find("https:") != std::string::npos;
   container->set_secure(secure);

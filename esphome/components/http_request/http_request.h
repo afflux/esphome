@@ -87,6 +87,7 @@ class HttpContainer : public Parented<HttpRequestComponent> {
   size_t content_length;
   int status_code;
   uint32_t duration_ms;
+  uint32_t start_ms;
 
   virtual int read(uint8_t *buf, size_t max_len) = 0;
   virtual void end() = 0;
@@ -228,12 +229,14 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
   }
 
   void loop() override {
-    this->active_requests_.remove_if([this](decltype(*this->active_requests_.cbegin()) &request) {
+    auto now = millis();
+    this->active_requests_.remove_if([&](decltype(*this->active_requests_.cbegin()) &request) {
       auto container = std::get<0>(request);
       auto buf = std::get<1>(request);
       size_t max_length = std::get<2>(request);
 
-      if (container->duration_ms > this->parent_->get_timeout()) {
+      auto duration_ms = now - container->start_ms;
+      if (duration_ms > this->parent_->get_timeout()) {
         for (auto *trigger : this->error_triggers_)
           trigger->trigger();
         return true;
