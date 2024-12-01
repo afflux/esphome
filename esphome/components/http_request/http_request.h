@@ -228,6 +228,8 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
   }
 
   void loop() override {
+    ExternalRAMAllocator<uint8_t> allocator(ExternalRAMAllocator<uint8_t>::ALLOW_FAILURE);
+
     auto now = millis();
     this->active_requests_.remove_if([&](decltype(*this->active_requests_.cbegin()) &request) {
       auto container = std::get<0>(request);
@@ -236,6 +238,10 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
 
       auto duration_ms = now - container->start_ms;
       if (duration_ms > this->parent_->get_timeout()) {
+        if (buf != nullptr) {
+          allocator.deallocate(buf, max_length);
+        }
+
         this->trigger_error_();
         return true;
       }
@@ -247,6 +253,7 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
           int bytes_read = container->read(buf + container->get_bytes_read(),
                                            std::min<size_t>(max_length - container->get_bytes_read(), 512));
           if (bytes_read < 0) {
+            allocator.deallocate(buf, max_length);
             // reader error (e.g. timeout or stream pointer gone)
             this->trigger_error_();
             return true;
@@ -260,7 +267,6 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
 
         response_body.reserve(container->get_bytes_read());
         response_body.assign(reinterpret_cast<char *>(buf), container->get_bytes_read());
-        ExternalRAMAllocator<uint8_t> allocator(ExternalRAMAllocator<uint8_t>::ALLOW_FAILURE);
         allocator.deallocate(buf, max_length);
       }
 
