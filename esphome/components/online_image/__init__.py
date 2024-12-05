@@ -163,7 +163,7 @@ async def to_code(config):
         template_ = await cg.templatable(
             config[CONF_HTTP_REQUEST_HEADERS][key],
             [],
-            cg.optional.template(cg.const_char_ptr),
+            cg.optional.template(cg.std_string),
         )
         cg.add(var.add_header(key, template_))
 
