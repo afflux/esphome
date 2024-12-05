@@ -101,10 +101,10 @@ class HttpContainer : public Parented<HttpRequestComponent> {
   bool secure_{false};
 };
 
-class HttpRequestResponseTrigger : public Trigger<std::shared_ptr<HttpContainer>, std::string &> {
+class HttpRequestResponseTrigger : public Trigger<std::shared_ptr<HttpContainer>, std::shared_ptr<std::string>> {
  public:
-  void process(std::shared_ptr<HttpContainer> container, std::string &response_body) {
-    this->trigger(std::move(container), response_body);
+  void process(std::shared_ptr<HttpContainer> container, std::shared_ptr<std::string> response_body) {
+    this->trigger(std::move(container), std::move(response_body));
   }
 };
 
@@ -246,7 +246,7 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
         return true;
       }
 
-      std::string response_body;
+      std::shared_ptr<std::string> response_body;
 
       if (buf != nullptr) {
         if (container->get_bytes_read() < max_length) {
@@ -265,22 +265,22 @@ template<typename... Ts> class HttpRequestSendAction : public Action<Ts...>, pub
           return false;
         }
 
-        response_body.reserve(container->get_bytes_read());
-        response_body.assign(reinterpret_cast<char *>(buf), container->get_bytes_read());
+        response_body = std::make_shared<std::string>((char *) buf, container->get_bytes_read());
         allocator.deallocate(buf, max_length);
       }
 
-      if (this->response_triggers_.size() == 1) {
-        // if there is only one trigger, no need to copy the response body
-        this->response_triggers_[0]->process(container, response_body);
-      } else {
-        for (auto *trigger : this->response_triggers_) {
-          // with multiple triggers, pass a copy of the response body to each
-          // one so that modifications made in one trigger are not visible to
-          // the others
-          auto response_body_copy = std::string(response_body);
-          trigger->process(container, response_body_copy);
+      size_t index = 0u;
+      auto num_triggers = this->response_triggers_.size();
+      for (auto *trigger : this->response_triggers_) {
+        // pass a copy of the response body to each trigger so that modifications
+        // made in one trigger are not visible to the others. Re-use the original
+        // response body for the last trigger.
+        std::shared_ptr<std::string> response_body_copy{response_body};
+        if (response_body && index != num_triggers - 1) {
+          response_body_copy = std::make_shared<std::string>(*response_body);
         }
+        trigger->process(container, response_body_copy);
+        index++;
       }
       container->end();
 
