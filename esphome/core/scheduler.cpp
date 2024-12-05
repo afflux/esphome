@@ -233,6 +233,11 @@ void HOT Scheduler::call() {
         WarnIfComponentBlockingGuard guard{item->component};
         item->callback();
       }
+
+#ifdef ESPHOME_LOG_HAS_VERY_VERBOSE
+      ESP_LOGVV(TAG, "Done running %s '%s'", item->get_type_str(), item->name.c_str());
+#endif
+
     }
 
     {

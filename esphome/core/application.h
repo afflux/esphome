@@ -460,6 +460,7 @@ class Application {
 #endif
 
   Scheduler scheduler;
+  const char *crashing_component = nullptr;
 
  protected:
   friend Component;

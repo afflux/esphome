@@ -27,6 +27,7 @@ void Application::register_component_(Component *comp) {
 }
 void Application::setup() {
   ESP_LOGI(TAG, "Running through setup()...");
+  this->crashing_component = reinterpret_cast<const char *>(watchdog_hw->scratch[0]);
   ESP_LOGV(TAG, "Sorting components by setup priority...");
   std::stable_sort(this->components_.begin(), this->components_.end(), [](const Component *a, const Component *b) {
     return a->get_actual_setup_priority() > b->get_actual_setup_priority();
@@ -69,6 +70,7 @@ void Application::loop() {
   this->scheduler.call();
   this->feed_wdt();
   for (Component *component : this->looping_components_) {
+	    watchdog_hw->scratch[0] = reinterpret_cast<uintptr_t>(component->get_component_source());
     {
       WarnIfComponentBlockingGuard guard{component};
       component->call();
@@ -77,6 +79,7 @@ void Application::loop() {
     this->app_state_ |= new_app_state;
     this->feed_wdt();
   }
+watchdog_hw->scratch[0] = 0;
   this->app_state_ = new_app_state;
 
   const uint32_t now = millis();
