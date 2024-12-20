@@ -24,6 +24,11 @@
 #define PROGMEM ICACHE_RODATA_ATTR
 #endif
 
+#elif defined(USE_RP2040)
+
+#define IRAM_ATTR __noinline __not_in_flash("iram")
+#define PROGMEM
+
 #else
 
 #define IRAM_ATTR
